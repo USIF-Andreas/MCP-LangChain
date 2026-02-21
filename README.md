@@ -1,83 +1,176 @@
-# LangChain + MCP Agent — Example Project
+# 🤖 LangChain × MCP Agent
 
-## How it works
+![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black)
+![LangChain](https://img.shields.io/badge/LangChain-1.x-1C3C3C?style=for-the-badge&logo=langchain&logoColor=white)
+![Ollama](https://img.shields.io/badge/Ollama-local-black?style=for-the-badge&logo=ollama&logoColor=white)
+![Anthropic](https://img.shields.io/badge/Anthropic-Claude-D97706?style=for-the-badge&logo=anthropic&logoColor=white)
+
+A full-stack AI agent connecting a **React UI** → **FastAPI** → **LangGraph agent** → **MCP tools**, running on local Ollama models or Anthropic Claude.
+
+---
+
+## 🏗️ Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                      agent.py                           │
-│                                                         │
-│  User message                                           │
-│      │                                                  │
-│      ▼                                                  │
-│  LangChain AgentExecutor                                │
-│      │                                                  │
-│      ├── ChatOpenAI (GPT-4o-mini)  ← decides what to do│
-│      │                                                  │
-│      └── MCP Tools (via langchain-mcp-adapters)         │
-│              │                                          │
-│              │  stdio (subprocess)                      │
-│              ▼                                          │
-│         mcp_server.py                                   │
-│              │                                          │
-│              ├── get_weather(city)                      │
-│              ├── calculate(expression)                  │
-│              └── save_note(note)                        │
-└─────────────────────────────────────────────────────────┘
+🌐 React UI (Vite)
+      │
+      │  HTTP / SSE streaming
+      ▼
+⚡ FastAPI Backend
+      │
+      ├── 🧠 LangGraph Agent (create_react_agent)
+      │         └── 🦙 Ollama  or  🤖 Anthropic
+      │
+      └── 🔌 MCP Client
+                │  stdio
+                ▼
+          🛠️ MCP Server
+                ├── ⛅ get_weather(city)
+                ├── 🧮 calculate(expression)
+                └── 📝 save_note(note)
 ```
 
-## Setup
+---
+
+## 📁 Project Structure
+
+```
+MCP-LangChain/
+├── 🐍 mcp_server.py     — MCP server with 3 tools
+├── 🐍 backend.py        — FastAPI + LangGraph agent
+├── 🐍 agent.py          — CLI agent (no UI)
+└── ⚛️  frontend/
+    └── src/
+        └── App.jsx      — React chat UI
+```
+
+---
+
+## ⚙️ Prerequisites
+
+| | Tool | Version |
+|--|------|---------|
+| 🐍 | Python | 3.12+ |
+| 📦 | Node.js | 18+ |
+| 🦙 | Ollama | latest |
+
+---
+
+## 🚀 Quick Start
+
+### 1️⃣ Install dependencies
 
 ```bash
-pip install langchain langchain-openai langchain-mcp-adapters mcp
-export OPENAI_API_KEY="sk-..."
+pip install fastapi uvicorn langchain langchain-ollama \
+            langchain-anthropic langchain-mcp-adapters \
+            mcp langgraph httpx
 ```
 
-## Run
+### 2️⃣ Pull a model
 
 ```bash
-python agent.py
+ollama pull llama3.2      # 2GB — fast
+ollama pull qwen2.5       # best tool-calling
+ollama pull mistral       # great all-rounder
 ```
 
-## Key concepts
+### 3️⃣ Start all 3 services
 
-| Concept | File | Role |
-|---|---|---|
-| MCP Server | `mcp_server.py` | Exposes tools using the MCP standard |
-| MCP Client | inside `agent.py` | Connects to server, loads tool definitions |
-| LangChain Adapter | `load_mcp_tools()` | Converts MCP tools → LangChain Tool objects |
-| LangChain Agent | `agent.py` | Orchestrates LLM + tool calls in a loop |
-| AgentExecutor | `agent.py` | Runs the think→act→observe loop |
+| Terminal | Command |
+|----------|---------|
+| 🦙 **Ollama** | `OLLAMA_HOST=0.0.0.0 ollama serve` |
+| ⚡ **Backend** | `uvicorn backend:app --reload --port 8000` |
+| 🌐 **Frontend** | `cd frontend && npm install && npm run dev` |
 
-## What happens step by step
+Open 👉 **http://localhost:5173**
 
-1. `agent.py` starts `mcp_server.py` as a **subprocess** over stdio
-2. MCP handshake happens — client discovers available tools
-3. `load_mcp_tools()` wraps them as LangChain tools
-4. User message goes to the LangChain agent
-5. LLM decides which tools to call and with what arguments
-6. Tool calls are forwarded to the MCP server
-7. MCP server runs the tool and returns results
-8. LLM sees the results and decides next step (more tools or final answer)
-9. Final answer is returned to the user
+---
 
-## Swap the LLM
+## 🔌 API Endpoints
 
-```python
-# Use Anthropic Claude instead of OpenAI
-from langchain_anthropic import ChatAnthropic
-llm = ChatAnthropic(model="claude-sonnet-4-20250514")
+| Method | Route | Description |
+|--------|-------|-------------|
+| `POST` | `/chat` | Run agent · streams SSE |
+| `GET` | `/health` | Backend alive check |
+| `GET` | `/check-ollama` | Ollama status + models |
+| `GET` | `/check-anthropic` | API key check |
 
-# Use a local model via Ollama
-from langchain_ollama import ChatOllama
-llm = ChatOllama(model="llama3.2")
+---
+
+## 🛠️ MCP Tools
+
+| Icon | Tool | Input | What it does |
+|------|------|-------|-------------|
+| ⛅ | `get_weather` | `city: str` | Fake weather for any city |
+| 🧮 | `calculate` | `expression: str` | Math — `"12 * 8"` → `96` |
+| 📝 | `save_note` | `note: str` | Appends to `notes.txt` |
+
+---
+
+## 🧠 LLM Providers
+
+### 🦙 Ollama — free, local, private
+
+```bash
+python agent.py --provider ollama --model llama3.2
+python agent.py --provider ollama --model qwen2.5
 ```
 
-## Swap to a remote MCP server (HTTP/SSE)
+### 🤖 Anthropic Claude — cloud
 
-```python
-from mcp.client.sse import sse_client
-
-async with sse_client("http://localhost:8000/sse") as (read, write):
-    async with ClientSession(read, write) as session:
-        # same code from here...
+```bash
+export ANTHROPIC_API_KEY="sk-ant-..."
+python agent.py --provider anthropic --model claude-haiku-4-5-20251001
 ```
+
+---
+
+## 🖥️ UI Features
+
+| | Feature |
+|--|---------|
+| 🟢 | Live status dots — backend, Ollama, API key |
+| ⚠️ | Warning banner with exact fix command |
+| 🔧 | Tool call + result cards shown in real time |
+| ✨ | Answer streams word by word |
+| 🔄 | Switch provider/model from the UI |
+| 🚫 | Input locked until all services are green |
+
+---
+
+## ☁️ GitHub Codespaces
+
+```bash
+# 1. Set ports 8000 and 11434 to Public in the Ports tab
+# 2. Update URLs in App.jsx:
+sed -i 's|http://localhost:8000|https://YOUR-CODESPACE-8000.app.github.dev|g' frontend/src/App.jsx
+sed -i 's|http://localhost:11434|https://YOUR-CODESPACE-11434.app.github.dev|g' frontend/src/App.jsx
+```
+
+---
+
+## 🐛 Troubleshooting
+
+| ❌ Error | 💡 Fix |
+|---------|--------|
+| `Could not import module "backend"` | Run uvicorn from project root |
+| `TaskGroup unhandled error` | Restart the backend |
+| `list is not of type string` | Ask about one city at a time |
+| Ollama dot stays 🔴 | Start with `OLLAMA_HOST=0.0.0.0 ollama serve` |
+| Black screen | Remove `App.css` / `index.css` imports from `main.jsx` |
+| 403 on Codespaces | Set ports to **Public** in Ports tab |
+
+---
+
+## 📦 Tech Stack
+
+| Layer | Tech |
+|-------|------|
+| 🎨 **Frontend** | React 18 · Vite · CSS-in-JS |
+| ⚡ **Backend** | FastAPI · Uvicorn · SSE |
+| 🧠 **Agent** | LangChain · LangGraph · `create_react_agent` |
+| 🔌 **Tools** | MCP — Model Context Protocol |
+| 🦙 **Local LLM** | Ollama — llama3.2 · qwen2.5 · mistral |
+| ☁️ **Cloud LLM** | Anthropic — Claude Haiku · Sonnet |
